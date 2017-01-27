@@ -16,7 +16,7 @@
 #include "dispatch.h"
 #include "proto_crypt.h"
 
-volatile sig_atomic_t should_shutdown = 0;
+static volatile sig_atomic_t should_shutdown = 0;
 static void * graceful_shutdown_timer_cookie = NULL;
 
 static void
@@ -227,6 +227,7 @@ main(int argc, char * argv[])
 	/* We should have processed all the arguments. */
 	if (argc != 0)
 		usage();
+	(void)argv; /* argv is not used beyond this point. */
 
 	/* Set defaults. */
 	if (opt_n == 0)

@@ -187,7 +187,7 @@ SHA256_Pad(SHA256_CTX * ctx, uint32_t tmp32[static restrict 72])
 }
 
 /* Magic initialization constants. */
-static const uint32_t initstate[8] = {
+static const uint32_t initial_state[8] = {
 	0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A,
 	0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19
 };
@@ -204,7 +204,7 @@ SHA256_Init(SHA256_CTX * ctx)
 	ctx->count = 0;
 
 	/* Initialize state. */
-	memcpy(ctx->state, initstate, sizeof(initstate));
+	memcpy(ctx->state, initial_state, sizeof(initial_state));
 }
 
 /**
@@ -299,7 +299,7 @@ SHA256_Final(uint8_t digest[32], SHA256_CTX * ctx)
 
 /**
  * SHA256_Buf(in, len, digest):
- * Compute the SHA256 hash of ${len} bytes from $in} and write it to ${digest}.
+ * Compute the SHA256 hash of ${len} bytes from ${in} and write it to ${digest}.
  */
 void
 SHA256_Buf(const void * in, size_t len, uint8_t digest[32])

@@ -38,12 +38,6 @@ usage(void)
 	exit(1);
 }
 
-/* Simplify error-handling in command-line parse loop. */
-#define OPT_EPARSE(opt, arg) do {					\
-	warnp("Error parsing argument: -%c %s", opt, arg);		\
-	exit(1);							\
-} while (0)
-
 int
 main(int argc, char * argv[])
 {
@@ -118,6 +112,7 @@ main(int argc, char * argv[])
 	/* We should have processed all the arguments. */
 	if (argc != 0)
 		usage();
+	(void)argv; /* argv is not used beyond this point. */
 
 	/* Set defaults. */
 	if (opt_o == 0.0)
