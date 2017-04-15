@@ -4,7 +4,6 @@
 # - establish a connection to a spiped server.
 # - open a connection, but don't send anything.
 # - close the connection.
-# - server should quit (because we gave it -1).
 
 ### Constants
 
@@ -13,11 +12,12 @@
 scenario_cmd() {
 	# Set up infrastructure.
 	setup_spiped_decryption_server
+	setup_spiped_encryption_server
 
 	# Open and close a connection.
 	setup_check_variables
 	(
-		echo "" | nc 127.0.0.1 ${mid_port} >/dev/null
+		echo "" | ${nc_client_binary} [127.0.0.1]:${src_port}
 		echo $? > ${c_exitfile}
 	)
 

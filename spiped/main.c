@@ -1,4 +1,4 @@
-#include <inttypes.h>
+#include <math.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -10,14 +10,13 @@
 #include "daemonize.h"
 #include "events.h"
 #include "getopt.h"
+#include "graceful_shutdown.h"
+#include "parsenum.h"
 #include "sock.h"
 #include "warnp.h"
 
 #include "dispatch.h"
 #include "proto_crypt.h"
-
-static volatile sig_atomic_t should_shutdown = 0;
-static void * graceful_shutdown_timer_cookie = NULL;
 
 static void
 usage(void)
@@ -33,15 +32,14 @@ usage(void)
 	exit(1);
 }
 
-/*
- * Signal handler for SIGTERM to perform a graceful shutdown.
- */
-static void
-graceful_shutdown_handler(int signo)
+static int
+callback_graceful_shutdown(void * dispatch_cookie)
 {
 
-	(void)signo; /* UNUSED */
-	should_shutdown = 1;
+	dispatch_request_shutdown(dispatch_cookie);
+
+	/* Success! */
+	return(0);
 }
 
 /*
@@ -53,26 +51,6 @@ diediedie_handler(int signo)
 
 	(void)signo; /* UNUSED */
 	_exit(0);
-}
-
-/*
- * Requests a graceful shutdown of the given cookie.
- */
-static int
-graceful_shutdown(void * cookie)
-{
-	struct accept_state * A = cookie;
-
-	/* This timer has expired. */
-	graceful_shutdown_timer_cookie = NULL;
-
-	if (should_shutdown)
-		dispatch_request_shutdown(A);
-	else
-		graceful_shutdown_timer_cookie = events_timer_register_double(
-		    graceful_shutdown, A, 1.0);
-
-	return (0);
 }
 
 /* Simplify error-handling in command-line parse loop. */
@@ -93,9 +71,12 @@ main(int argc, char * argv[])
 	int opt_F = 0;
 	int opt_j = 0;
 	const char * opt_k = NULL;
-	intmax_t opt_n = 0;
+	int opt_n_set = 0;
+	size_t opt_n = 0;
+	int opt_o_set = 0;
 	double opt_o = 0.0;
 	char * opt_p = NULL;
+	int opt_r_set = 0;
 	double opt_r = 0.0;
 	int opt_R = 0;
 	const char * opt_s = NULL;
@@ -157,21 +138,21 @@ main(int argc, char * argv[])
 			opt_k = optarg;
 			break;
 		GETOPT_OPTARG("-n"):
-			if (opt_n != 0)
+			if (opt_n_set)
 				usage();
-			if ((opt_n = strtoimax(optarg, NULL, 0)) == 0) {
+			opt_n_set = 1;
+			if (PARSENUM(&opt_n, optarg)) {
 				warn0("Invalid option: -n %s", optarg);
 				exit(1);
 			}
-			if ((opt_n <= 0) || (opt_n > 500)) {
-				warn0("The parameter to -n must be between 1 and 500\n");
-				exit(1);
-			}
+			if (opt_n == 0)
+				opt_n = SIZE_MAX;
 			break;
 		GETOPT_OPTARG("-o"):
-			if (opt_o != 0.0)
+			if (opt_o_set)
 				usage();
-			if ((opt_o = strtod(optarg, NULL)) == 0.0) {
+			opt_o_set = 1;
+			if (PARSENUM(&opt_o, optarg, 0, INFINITY)) {
 				warn0("Invalid option: -o %s", optarg);
 				exit(1);
 			}
@@ -183,9 +164,10 @@ main(int argc, char * argv[])
 				OPT_EPARSE(ch, optarg);
 			break;
 		GETOPT_OPTARG("-r"):
-			if (opt_r != 0.0)
+			if (opt_r_set)
 				usage();
-			if ((opt_r = strtod(optarg, NULL)) == 0.0) {
+			opt_r_set = 1;
+			if (PARSENUM(&opt_r, optarg, 0, INFINITY)) {
 				warn0("Invalid option: -r %s", optarg);
 				exit(1);
 			}
@@ -230,7 +212,7 @@ main(int argc, char * argv[])
 	(void)argv; /* argv is not used beyond this point. */
 
 	/* Set defaults. */
-	if (opt_n == 0)
+	if (!opt_n_set)
 		opt_n = 100;
 	if (opt_o == 0.0)
 		opt_o = 5.0;
@@ -253,17 +235,20 @@ main(int argc, char * argv[])
 	if (opt_t == NULL)
 		usage();
 
+	/*
+	 * A limit of SIZE_MAX connections is equivalent to any larger limit;
+	 * we'll be unable to allocate memory for socket bookkeeping before we
+	 * reach either.
+	 */
+	if (opt_n > SIZE_MAX)
+		opt_n = SIZE_MAX;
+
 	/* Figure out where our pid should be written. */
 	if (opt_p == NULL) {
 		if (asprintf(&opt_p, "%s.pid", opt_s) == -1) {
 			warnp("asprintf");
 			goto err0;
 		}
-	}
-
-	if (signal(SIGTERM, graceful_shutdown_handler) == SIG_ERR) {
-		warnp("Failed to bind SIGTERM signal handler");
-		goto err1;
 	}
 
 	/* Check whether we are running as init (e.g., inside a container). */
@@ -330,15 +315,18 @@ main(int argc, char * argv[])
 
 	/* Start accepting connections. */
 	if ((dispatch_cookie = dispatch_accept(s, opt_t, opt_R ? 0.0 : opt_r,
-	    sas_t, opt_d, opt_f, opt_g, opt_j, K, (size_t)opt_n, opt_o, opt_1,
+	    sas_t, opt_d, opt_f, opt_g, opt_j, K, opt_n, opt_o, opt_1,
 	    &conndone)) == NULL) {
 		warnp("Failed to initialize connection acceptor");
 		goto err5;
 	}
 
-	/* Check periodically whether a signal was received. */
-	graceful_shutdown_timer_cookie = events_timer_register_double(
-	    graceful_shutdown, dispatch_cookie, 1.0);
+	/* Register a handler for SIGTERM. */
+	if (graceful_shutdown_initialize(&callback_graceful_shutdown,
+	    dispatch_cookie)) {
+		warn0("Failed to start graceful_shutdown timer");
+		goto err6;
+	}
 
 	/*
 	 * Loop until an error occurs, or a connection closes if the
@@ -348,10 +336,6 @@ main(int argc, char * argv[])
 		warnp("Error running event loop");
 		goto err6;
 	}
-
-	/* Deregister the graceful_shutdown timer. */
-	if (graceful_shutdown_timer_cookie != NULL)
-		events_timer_cancel(graceful_shutdown_timer_cookie);
 
 	/* Stop accepting connections and shut down the dispatcher. */
 	dispatch_shutdown(dispatch_cookie);
@@ -373,8 +357,6 @@ main(int argc, char * argv[])
 	exit(0);
 
 err6:
-	if (graceful_shutdown_timer_cookie != NULL)
-		events_timer_cancel(graceful_shutdown_timer_cookie);
 	dispatch_shutdown(dispatch_cookie);
 err5:
 	events_shutdown();

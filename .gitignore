@@ -4,5 +4,9 @@ spipe/*.o
 spipe/spipe
 spiped/*.o
 spiped/spiped
+tests/nc-client/*.o
+tests/nc-client/nc-client
+tests/nc-server/*.o
+tests/nc-server/nc-server
 tests/valgrind/*.o
 tests/valgrind/potential-memleaks

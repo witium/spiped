@@ -5,7 +5,6 @@
 # - open a connection, but don't send anything.
 # - wait; the connection should be closed automatically (because we
 #   gave it -o 1).
-# - server should quit (because we gave it -1).
 
 ### Constants
 
@@ -14,13 +13,13 @@
 scenario_cmd() {
 	# Set up infrastructure.
 	setup_spiped_decryption_server
+	setup_spiped_encryption_server
 
-	# Open and close a connection.  Awkwardly force nc to keep
-	# the connection open; the simple "nc -q 2 ..." to wait 2
-	# seconds isn't portable.
+	# Open and close a connection, keeping it open for 2 seconds.
 	setup_check_variables
 	(
-		( echo "" ; sleep 2 ) | nc 127.0.0.1 ${mid_port} >/dev/null
+		( echo "" ; sleep 2 ) |		\
+			 ${nc_client_binary} [127.0.0.1]:${src_port}
 		echo $? > ${c_exitfile}
 	) &
 	sleep 3

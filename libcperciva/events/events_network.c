@@ -82,7 +82,7 @@ init(void)
 	if ((S = socketlist_init(0)) == NULL)
 		goto err0;
 
-	/* We have no poll structures allocated or initialzed. */
+	/* We have no poll structures allocated or initialized. */
 	fds = NULL;
 	fds_alloc = nfds = fdscanpos = 0;
 
@@ -374,7 +374,7 @@ events_network_select(struct timeval * tv)
 	events_network_selectstats_select();
 
 	/* Poll. */
-	while (poll(fds, nfds, timeout) == -1) {
+	while (poll(fds, (nfds_t)nfds, timeout) == -1) {
 		/* EINTR is harmless. */
 		if (errno == EINTR)
 			continue;
