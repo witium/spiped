@@ -4,6 +4,8 @@ spipe/*.o
 spipe/spipe
 spiped/*.o
 spiped/spiped
+perftests/send-zeros/*.o
+perftests/send-zeros/send-zeros
 tests/nc-client/*.o
 tests/nc-client/nc-client
 tests/nc-server/*.o
