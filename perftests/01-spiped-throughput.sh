@@ -39,8 +39,7 @@ scenario_cmd() {
 	printf "Sending $((${total}/1000000)) Mb via send-zeros -> recv-zeros\n"
 	printf "block\tcount\ttime (s)\tspeed (Mb/s)\n"
 
-	#for bs in 8192
-	for bs in 512 1024 2048 4096 8192
+	for bs in 512 1024 2048 4096 8192 16384 32768 65536
 	do
 		run ${bs}
 	done
