@@ -40,7 +40,7 @@ scenario_cmd() {
 	printf "block\tcount\ttime (s)\tspeed (Mb/s)\n"
 
 	#for bs in 8192
-	for bs in 2048 4096 8192 16384
+	for bs in 512 1024 2048 4096 8192
 	do
 		run ${bs}
 	done
