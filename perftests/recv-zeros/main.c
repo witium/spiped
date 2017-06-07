@@ -67,7 +67,7 @@ main(int argc, char ** argv)
 	/* Receive data, but do nothing with it. */
 	r = buflen;
 	while (r == buflen)
-		r = recv(socket_recv, buffer, (size_t)buflen, 0);
+		r = recv(socket_recv, buffer, (size_t)buflen, MSG_WAITALL);
 	if (r != 0) {
 		warnp("recv");
 		goto err4;
