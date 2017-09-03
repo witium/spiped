@@ -3,14 +3,9 @@ if ! [ ${PATH} = "$1" ]; then
 	echo "WARNING: POSIX violation: $SHELL's command -p resets \$PATH" 1>&2
 	PATH=$1
 fi
-FIRST=YES
 for LIB in rt xnet; do
 	if ${CC} -l${LIB} posix-l.c 2>/dev/null; then
-		if [ ${FIRST} = "NO" ]; then
-			printf " ";
-		fi
-		printf "%s" "-l${LIB}";
-		FIRST=NO;
+		printf "%s" " -l${LIB}";
 	else
 		echo "WARNING: POSIX violation: make's CC doesn't understand -l${LIB}" 1>&2
 	fi
